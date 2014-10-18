@@ -1,0 +1,336 @@
+<html>
+
+<head>
+<title></title>
+
+	<link href="bootstrap/css/bootstrap.css" rel="stylesheet">
+	<link href="bootstrap/css/plugins/dataTables.bootstrap.css" rel="stylesheet">
+	<link href="bootstrap/css/sb-admin-2.css" rel="stylesheet">
+	<link href="bootstrap/css/docs.min.css" rel="stylesheet">
+
+<style>
+	body{
+		overflow-x: hidden;
+	}
+</style>
+
+<script>
+var app = {
+	/*
+	Network functions
+	*/
+	detectedIP: null,
+	connect:function(){
+		var net = require('net');
+
+		var HOST = '127.0.0.1';
+		var PORT = 6969;
+
+		// Create a server instance, and chain the listen function to it
+		// The function passed to net.createServer() becomes the event handler for the 'connection' event
+		// The sock object the callback function receives UNIQUE for each connection
+		net.createServer(function(sock) {
+			
+			// We have a connection - a socket object is assigned to the connection automatically
+			app.logTCP('CONNECTED: ' + sock.remoteAddress + ':' + sock.remotePort);
+			
+			// Add a 'data' event handler to this instance of socket
+			sock.on('data', function(data) {
+				
+				app.logTCP('DATA ' + sock.remoteAddress + ': ' + data);
+				// Write the data back to the socket, the client will receive it as data from the server
+				sock.write('You said "' + data + '"');
+				
+			});
+			
+			// Add a 'close' event handler to this instance of socket
+			sock.on('close', function(data) {
+				app.logTCP('CLOSED: ' + sock.remoteAddress + ' ' + sock.remotePort);
+			});
+
+			sock.on('error', function(data) {
+				app.logTCP('ERROR: ' + data);
+			});
+			
+		}).listen(PORT, HOST);
+
+		app.logTCP('Server listening on ' + HOST + ':' + PORT);
+	},
+	logTCP:function(data){
+		console.log(data);
+		document.getElementById('status').innerHTML += data + "<br>";
+	},	
+	getIP:function(){
+		var os = require('os');
+		var ifaces = os.networkInterfaces();
+		for (var dev in ifaces) {
+			ifaces[dev].forEach(function(details){
+				console.log(details);
+				if (details.family == 'IPv4' && details.internal == false) {
+					app.detectedIP = details.address;
+				}
+			});
+		}
+	},
+
+	/*
+	General app functions
+	*/
+	quizDirectory: "quizzes/",
+	writeFile:function(name, data){
+		var fs = require('fs');
+		fs.writeFileSync(app.quizDirectory + name, data);
+	},
+	readFile:function(name){
+		var fs = require('fs');
+		return fs.readFileSync(app.quizDirectory + name, 'utf8');
+	},
+	sceneChange:function(scene){
+		if (scene == "create"){
+			app.iniCreateScene();
+		} else if (scene == "quiz"){
+			app.iniQuizScene();
+		} else if (scene == "main"){
+			app.iniMainScene();
+		}
+	},
+
+	iniMainScene:function(){
+		document.getElementById('scene_create').style.display = "none";
+		document.getElementById('scene_quiz').style.display = "none";
+		document.getElementById('scene_main').style.display = "block";
+	},
+
+
+	/*
+	Quiz functions
+	*/
+	iniQuizScene:function(){
+		document.getElementById('scene_main').style.display = "none";
+		document.getElementById('scene_quiz').style.display = "block";
+
+		app.getIP();
+		document.getElementById('quizhost').value = app.detectedIP;
+	},
+
+
+	/*
+	Create quiz functions
+	*/
+	quizBankList: null,
+	currentIndex: 0,
+	iniCreateScene:function(){
+		document.getElementById('scene_main').style.display = "none";
+		document.getElementById('scene_create').style.display = "block";
+		app.quizBankList = [];
+		app.quizBankList.push({question: "", choices: ["", "", "", ""], answer: 0});
+		app.currentIndex = 0;
+		app.arrayToSelectList();
+	},
+	arrayToForm:function(index){
+		var data = app.quizBankList[index];
+
+		//Restore the question text
+		document.getElementById('create_question').value = data.question;
+
+		//Restore the choice text
+		for (var i = 0; i < data.choices.length; i++){
+			document.getElementById('create_choice' + i).value = data.choices[i];
+		}
+
+		//Restore the answer checked radio btn
+		document.getElementById('create_ansradio' + data.answer).checked = true;
+	},
+	formToArray:function(index){
+		var data = app.quizBankList[index];
+
+		//Store the question text
+		data.question = document.getElementById('create_question').value;
+
+		//Store the choice text
+		for (var i = 0; i < data.choices.length; i++){
+			data.choices[i] = document.getElementById('create_choice' + i).value;
+		}	
+
+		//Store the correct answer based on checked radio btn
+		for (var i = 0; i < data.choices.length; i++){
+			if (document.getElementById('create_ansradio' + i).checked == true){
+				data.answer = i;
+				break;
+			}
+		}
+	},
+	arrayToSelectList:function(){
+		//Clear out the list
+		document.getElementById('questionBank').options.length = 0;
+
+		//Populate the list with items
+		var bank = document.getElementById("questionBank");
+		for (var i = 0; i < app.quizBankList.length; i++){
+			var option = document.createElement("option");
+			option.text = "Question " + i;
+			option.value = i;
+			bank.add(option);
+		}
+
+		//Adjust selection of the list
+		if (app.quizBankList.length > 0){
+			var index = app.quizBankList.length - 1;
+			bank.options[index].selected = true;
+
+			app.changeQuestion(index);
+		}		
+	},
+	changeQuestion:function(index){
+		//If the old index is valid save the old question data
+		if (app.currentIndex != -1){
+			app.formToArray(app.currentIndex);
+		}
+
+		//Load the new question data
+		app.arrayToForm(index);
+
+		//Save the index so we can use it later
+		app.currentIndex = index;
+	},
+	addQuestion:function(){
+		app.quizBankList.push({question: "", choices: ["", "", "", ""], answer: 0});
+		app.arrayToSelectList();
+	},
+	removeQuestion:function(){
+		var bank = document.getElementById("questionBank");
+
+		//Remove question
+		app.quizBankList.splice(bank.selectedIndex, 1);
+
+		//Set index to -1
+		app.currentIndex = -1;
+		app.arrayToSelectList();
+	},
+	adjustBankSelection:function(){
+		var bank = document.getElementById("questionBank");
+
+	},
+	saveQuiz:function(){
+		if (app.quizBankList.length > 0){
+			app.formToArray(app.currentIndex);
+			var data = JSON.stringify(app.quizBankList, null, "\t");
+			var name = prompt('Enter a filename (Saves to this apps directory)','quiz.txt');
+			if (name){
+				app.writeFile(name, data);
+			}
+		}
+	},
+	loadQuiz:function(){
+		var name = prompt('Enter a filename (Reads from this apps directory)','quiz.txt');
+		if (name){
+			var data = app.readFile(name);
+			app.quizBankList = JSON.parse(data);
+			app.arrayToSelectList();
+		}
+	}
+};
+</script>
+
+</head>
+
+<body onload="app.sceneChange('main');">
+
+<div id="scene_main" style="display:block;">
+	<center>
+		<br>
+		<br>
+		<input type="button" value="Create Quiz" class="btn btn-primary" onclick="app.sceneChange('create');">
+		<input type="button" value="Start Quiz" class="btn btn-warning" onclick="app.sceneChange('quiz');">
+	</center>
+</div>
+
+<div id="scene_create" style="display:none;">
+	<div class="row">
+		<div class="col-xs-6">
+
+			<div class="bs-callout bs-callout-info">
+				<b>Question:</b><br>
+				<textarea class="form-control" id="create_question"></textarea>
+			</div>
+
+			<div class="bs-callout bs-callout-primary">
+				<b>Choices:</b><br>
+				<table style="width:100%;">
+					<tr>
+						<td></td><td style="text-align:center;font-weight:bold;">Answer</td>
+					</tr>
+					<tr>
+						<td><input type="textarea" class="form-control" id="create_choice0"></td>
+						<td><input type="radio" class="form-control" name="correct" id="create_ansradio0" checked></td>
+					</tr>
+					<tr>
+						<td><input type="textarea" class="form-control" id="create_choice1"></td>
+						<td><input type="radio" class="form-control" name="correct" id="create_ansradio1"></td>
+					</tr>
+					<tr>
+						<td><input type="textarea" class="form-control" id="create_choice2"></td>
+						<td><input type="radio" class="form-control" name="correct" id="create_ansradio2"></td>
+					</tr>
+					<tr>
+						<td><input type="textarea" class="form-control" id="create_choice3"></td>
+						<td><input type="radio" class="form-control" name="correct" id="create_ansradio3"></td>
+					</tr>
+				</table>
+			</div>
+
+		</div>
+		<div class="col-xs-6">
+
+			<div class="bs-callout bs-callout-primary">
+				<b>Question Bank:</b><br>
+				<select class="form-control" size="10" id="questionBank" onchange="app.changeQuestion(this.selectedIndex)">
+					<option value="0" selected>Question</option>
+				</select>
+				<br>
+				<input type="button" value="Add" class="btn btn-primary" onclick="app.addQuestion();">
+				<input type="button" value="Delete" class="btn btn-primary" onclick="app.removeQuestion();">
+			</div>
+
+
+			<div class="bs-callout bs-callout-info">
+				<input type="button" value="Save Quiz" class="btn btn-info" onclick="app.saveQuiz();">
+				<input type="button" value="Load Quiz" class="btn btn-info" onclick="app.loadQuiz();">
+				<input type="button" value="Main Menu" class="btn btn-info" onclick="app.sceneChange('main');">
+			</div>
+
+		</div>
+	</div>
+</div>
+
+
+<div id="scene_quiz" style="display:none;">
+	<div class="row">
+		<div class="col-xs-4">
+			<div class="form-group input-group">
+				<span class="input-group-addon">Host:</span>
+				<input type="text" id="quizhost" value="" class="form-control">
+			</div>
+		</div>
+		<div class="col-xs-4">
+			<div class="form-group input-group">
+				<span class="input-group-addon">Port:</span>
+				<input type="text" id="quizport" value="6969" class="form-control">
+			</div>
+		</div>
+		<div class="col-xs-4">
+			<div class="form-group input-group">
+				<span class="input-group-addon">Quiz:</span>
+				<input type="text" id="quizfile" value="quiz.txt" class="form-control">
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<br>
+
+<div class="well" id="status" style="text-align:center;">Created by Gavin Delphia, USAFA 2014</div>
+
+</body>
+</html>

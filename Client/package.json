@@ -1,0 +1,16 @@
+{
+  "main": "index.html",
+  "name": "tcpClient",
+  "description": "",
+  "version": "1.0.0",
+  "window": {
+    "title": "tcpClient",
+    "icon": "icon.png",
+    "toolbar": true,
+    "frame": true,
+    "width": 500,
+    "height": 500,
+    "position": "center",
+    "resizable": false
+  }
+}

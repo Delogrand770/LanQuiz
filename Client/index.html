@@ -1,0 +1,74 @@
+<html>
+
+<head>
+<title></title>
+
+	<link href="bootstrap/css/bootstrap.css" rel="stylesheet">
+	<link href="bootstrap/css/plugins/dataTables.bootstrap.css" rel="stylesheet">
+	<link href="bootstrap/css/sb-admin-2.css" rel="stylesheet">
+	<link href="bootstrap/css/docs.min.css" rel="stylesheet">
+
+
+<script>
+var client;
+var app = {
+	ini:function(){
+		var net = require('net');
+
+		var HOST = '127.0.0.1';
+		var PORT = 6969;
+
+		client = new net.Socket();
+		client.connect(PORT, HOST, function() {
+
+			app.updateStatus('CONNECTED TO: ' + HOST + ':' + PORT);
+			// Write a message to the socket as soon as the client is connected, the server will receive it as message from the client 
+			client.write('hello');
+
+		});
+
+		// Add a 'data' event handler for the client socket
+		// data is what the server sent to this socket
+		client.on('data', function(data) {
+
+			app.updateStatus('DATA: ' + data);
+			// Close the client socket completely
+			//client.destroy();
+			
+		});
+
+		// Add a 'close' event handler for the client socket
+		client.on('close', function() {
+
+			app.updateStatus('Connection closed');
+
+		});
+
+		client.on('error', function(data) {
+
+			app.updateStatus('ERROR: ' + data);
+			
+		});
+	},
+	vote:function(vote){
+		client.write(vote);
+	},
+	updateStatus:function(data){
+		console.log(data);
+		document.getElementById('status').innerHTML += data + "<br>";
+	}
+}
+</script>
+
+</head>
+
+<body onload="app.ini();" onbeforeunload="client.destroy();">
+
+<div class="well" style="text-align:center;">What is the answer to The Ultimate Question of Life, the Universe, and Everything?</div>
+<div class="bs-callout bs-callout-primary" style="text-align:center;cursor:hand;" onclick="app.vote('0');">42</div>
+<div class="bs-callout bs-callout-success" style="text-align:center;cursor:hand;" onclick="app.vote('1');">It's too complex to explain</div>
+<div class="bs-callout bs-callout-danger" style="text-align:center;cursor:hand;" onclick="app.vote('2');">USAFA Astro Homework</div>
+<div class="bs-callout bs-callout-warning" style="text-align:center;cursor:hand;" onclick="app.vote('3');">Time and Space itself</div>
+<div class="well well-sm" id="status"></div>
+</body>
+</html>
